@@ -78,6 +78,50 @@
       font-weight: bold;
       font-size: 16px;
       box-shadow: 0 0 20px rgba(0, 0, 0, 0.6);
+      margin: 0;
+      padding: 0;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .centro:hover:not(:disabled) {
+      transform: translate(-50%, -50%) scale(1.06);
+    }
+
+    .centro:active:not(:disabled) {
+      transform: translate(-50%, -50%) scale(0.96);
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.6);
+    }
+
+    .centro:disabled {
+      opacity: 0.75;
+      cursor: not-allowed;
+    }
+
+    .boton-sonido {
+      position: absolute;
+      right: 18px;
+      top: 18px;
+      width: 52px;
+      height: 52px;
+      margin: 0;
+      padding: 0;
+      border-radius: 50%;
+      border: 4px solid #ffffff;
+      background: rgba(255, 204, 0, 0.96);
+      color: #222;
+      font-size: 24px;
+      line-height: 1;
+      z-index: 7;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 16px rgba(0, 0, 0, 0.45);
+    }
+
+    .boton-sonido:active {
+      transform: scale(0.94);
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.45);
     }
 
     button {
@@ -364,6 +408,14 @@
         font-size: 13px;
       }
 
+      .boton-sonido {
+        width: 44px;
+        height: 44px;
+        right: 10px;
+        top: 10px;
+        font-size: 20px;
+      }
+
       .modal-contenido img {
         max-width: 200px;
         max-height: 200px;
@@ -379,7 +431,8 @@
     <div class="ruleta-wrapper">
       <div class="puntero"></div>
       <canvas id="ruleta" width="700" height="700"></canvas>
-      <div class="centro">GIRAR</div>
+      <button id="btnGirarCentro" class="centro" type="button" aria-label="Girar ruleta">GIRAR</button>
+      <button id="btnSonido" class="boton-sonido" type="button" aria-label="Activar o desactivar sonido" title="Sonido activado">🔊</button>
     </div>
 
     <button id="btnGirar">Girar ruleta</button>
@@ -465,6 +518,8 @@
     const ctx = canvas.getContext("2d");
 
     const btnGirar = document.getElementById("btnGirar");
+    const btnGirarCentro = document.getElementById("btnGirarCentro");
+    const btnSonido = document.getElementById("btnSonido");
     const modalPremio = document.getElementById("modalPremio");
     const nombrePremio = document.getElementById("nombrePremio");
     const imagenPremio = document.getElementById("imagenPremio");
@@ -474,6 +529,129 @@
     let rotacionActual = 0;
     let girando = false;
     let mostrarFinalAlCerrarModal = false;
+
+    let sonidoActivo = localStorage.getItem("ruletaSonidoActivo") !== "false";
+    let audioCtx = null;
+    let intervaloTickRuleta = null;
+
+    function inicializarAudio() {
+      if (!sonidoActivo) return;
+
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) return;
+
+      if (!audioCtx) {
+        audioCtx = new AudioContextClass();
+      }
+
+      if (audioCtx.state === "suspended") {
+        audioCtx.resume();
+      }
+    }
+
+    function reproducirTono(frecuencia, duracion, tipo = "sine", volumen = 0.12) {
+      if (!sonidoActivo) return;
+      inicializarAudio();
+      if (!audioCtx) return;
+
+      const ahora = audioCtx.currentTime;
+      const oscilador = audioCtx.createOscillator();
+      const ganancia = audioCtx.createGain();
+
+      oscilador.type = tipo;
+      oscilador.frequency.setValueAtTime(frecuencia, ahora);
+
+      ganancia.gain.setValueAtTime(0.0001, ahora);
+      ganancia.gain.exponentialRampToValueAtTime(volumen, ahora + 0.015);
+      ganancia.gain.exponentialRampToValueAtTime(0.0001, ahora + duracion);
+
+      oscilador.connect(ganancia);
+      ganancia.connect(audioCtx.destination);
+
+      oscilador.start(ahora);
+      oscilador.stop(ahora + duracion + 0.03);
+    }
+
+    function reproducirClickRuleta() {
+      reproducirTono(900 + Math.random() * 220, 0.045, "square", 0.055);
+    }
+
+    function iniciarSonidoGiro() {
+      if (!sonidoActivo) return;
+      inicializarAudio();
+      detenerSonidoGiro();
+
+      let paso = 0;
+      let intervaloActual = 55;
+
+      const tick = () => {
+        reproducirClickRuleta();
+        paso++;
+
+        intervaloActual = Math.min(260, 55 + paso * 5.5);
+        intervaloTickRuleta = setTimeout(tick, intervaloActual);
+      };
+
+      tick();
+    }
+
+    function detenerSonidoGiro() {
+      if (intervaloTickRuleta) {
+        clearTimeout(intervaloTickRuleta);
+        intervaloTickRuleta = null;
+      }
+    }
+
+    function reproducirFanfarria() {
+      if (!sonidoActivo) return;
+      inicializarAudio();
+
+      const notas = [523.25, 659.25, 783.99, 1046.5];
+      notas.forEach((nota, index) => {
+        setTimeout(() => reproducirTono(nota, 0.18, "triangle", 0.13), index * 120);
+      });
+
+      setTimeout(() => reproducirTono(1318.51, 0.32, "sine", 0.12), 520);
+    }
+
+    function reproducirFinal() {
+      if (!sonidoActivo) return;
+      inicializarAudio();
+
+      const notas = [523.25, 659.25, 783.99, 1046.5, 1318.51, 1567.98];
+      notas.forEach((nota, index) => {
+        setTimeout(() => reproducirTono(nota, 0.22, "triangle", 0.13), index * 130);
+      });
+    }
+
+    function actualizarBotonSonido() {
+      btnSonido.textContent = sonidoActivo ? "🔊" : "🔇";
+      btnSonido.title = sonidoActivo ? "Sonido activado" : "Sonido desactivado";
+      btnSonido.setAttribute(
+        "aria-label",
+        sonidoActivo ? "Desactivar sonido" : "Activar sonido"
+      );
+    }
+
+    function alternarSonido(event) {
+      event.stopPropagation();
+      sonidoActivo = !sonidoActivo;
+      localStorage.setItem("ruletaSonidoActivo", String(sonidoActivo));
+      actualizarBotonSonido();
+
+      if (sonidoActivo) {
+        inicializarAudio();
+        reproducirTono(880, 0.08, "sine", 0.09);
+        setTimeout(() => reproducirTono(1174.66, 0.1, "sine", 0.09), 90);
+      } else {
+        detenerSonidoGiro();
+      }
+    }
+
+    function actualizarBotonesGiro(deshabilitado) {
+      btnGirar.disabled = deshabilitado;
+      btnGirarCentro.disabled = deshabilitado;
+    }
 
     function cargarImagenes() {
       const promesas = premios.map((premio) => {
@@ -631,13 +809,14 @@
       if (girando) return;
 
       if (premios.length === 0) {
-        btnGirar.disabled = true;
+        actualizarBotonesGiro(true);
         mostrarPantallaFinal();
         return;
       }
 
       girando = true;
-      btnGirar.disabled = true;
+      actualizarBotonesGiro(true);
+      iniciarSonidoGiro();
 
       const cantidadPremios = premios.length;
       const anguloPorPremio = 360 / cantidadPremios;
@@ -660,14 +839,16 @@
       canvas.style.transform = `rotate(${rotacionActual}deg)`;
 
       setTimeout(() => {
+        detenerSonidoGiro();
+        reproducirFanfarria();
         mostrarModalPremio(premioGanador);
         eliminarPremioGanador(premioGanador);
 
         if (premios.length === 0) {
           mostrarFinalAlCerrarModal = true;
-          btnGirar.disabled = true;
+          actualizarBotonesGiro(true);
         } else {
-          btnGirar.disabled = false;
+          actualizarBotonesGiro(false);
         }
 
         girando = false;
@@ -695,6 +876,7 @@
       modalPremio.classList.remove("activo");
       contenedor.classList.add("oculto");
       pantallaFinal.classList.add("activo");
+      reproducirFinal();
       crearConfetti(160);
       crearEstrellasFinales();
     }
@@ -766,10 +948,15 @@
     });
 
     btnGirar.addEventListener("click", girarRuleta);
+    btnGirarCentro.addEventListener("click", girarRuleta);
+    btnSonido.addEventListener("click", alternarSonido);
+
+    actualizarBotonSonido();
 
     cargarImagenes().then((imgs) => {
       imagenesCargadas = imgs;
       dibujarRuleta();
+      actualizarBotonesGiro(premios.length === 0);
     });
   </script>
 </body>
