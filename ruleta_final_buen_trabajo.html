@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ruleta de Premios</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Arial, sans-serif;
+      background: radial-gradient(circle, #34345a, #141421);
+      color: white;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow-x: hidden;
+    }
+
+    .contenedor {
+      text-align: center;
+      padding: 20px;
+    }
+
+    h1 {
+      margin-bottom: 20px;
+    }
+
+    .ruleta-wrapper {
+      position: relative;
+      width: 500px;
+      height: 500px;
+      margin: 0 auto;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      transition: transform 5s cubic-bezier(0.12, 0.75, 0.18, 1);
+      filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.25));
+    }
+
+    .puntero {
+      position: absolute;
+      top: -12px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 24px solid transparent;
+      border-right: 24px solid transparent;
+      border-top: 55px solid #ffcc00;
+      z-index: 5;
+      filter: drop-shadow(0 4px 4px rgba(0, 0, 0, 0.5));
+    }
+
+    .centro {
+      position: absolute;
+      width: 90px;
+      height: 90px;
+      background: #ffcc00;
+      border: 7px solid white;
+      border-radius: 50%;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 4;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: #222;
+      font-weight: bold;
+      font-size: 16px;
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.6);
+    }
+
+    button {
+      margin-top: 30px;
+      padding: 15px 32px;
+      font-size: 18px;
+      font-weight: bold;
+      border: none;
+      border-radius: 12px;
+      background: #ffcc00;
+      color: #222;
+      cursor: pointer;
+      box-shadow: 0 6px 0 #b88d00;
+      transition: transform 0.1s;
+    }
+
+    button:active {
+      transform: translateY(4px);
+      box-shadow: 0 2px 0 #b88d00;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 20;
+      padding: 20px;
+    }
+
+    .modal.activo {
+      display: flex;
+    }
+
+    .modal-contenido {
+      position: relative;
+      width: min(420px, 95vw);
+      background: linear-gradient(180deg, #ffffff, #f2f2f2);
+      color: #222;
+      border-radius: 24px;
+      padding: 28px;
+      text-align: center;
+      animation: aparecer 0.45s ease-out;
+      box-shadow: 0 0 40px rgba(255, 204, 0, 0.8);
+      overflow: hidden;
+    }
+
+    .modal-contenido::before {
+      content: "";
+      position: absolute;
+      inset: -4px;
+      background: conic-gradient(
+        #ffcc00,
+        #ff595e,
+        #8ac926,
+        #1982c4,
+        #ffcc00
+      );
+      z-index: -1;
+      animation: bordeBrillante 2s linear infinite;
+    }
+
+    .modal-contenido h2 {
+      margin: 0 0 12px;
+      font-size: 32px;
+      color: #ff9900;
+    }
+
+    .modal-contenido p {
+      font-size: 22px;
+      font-weight: bold;
+      margin: 12px 0 20px;
+    }
+
+    .modal-contenido img {
+      max-width: 260px;
+      max-height: 260px;
+      width: auto;
+      height: auto;
+      object-fit: contain;
+      animation: premioZoom 0.8s ease-out;
+    }
+
+    .cerrar {
+      margin-top: 20px;
+      padding: 12px 24px;
+      background: #222;
+      color: white;
+      box-shadow: none;
+      font-size: 16px;
+    }
+
+    .confetti {
+      position: fixed;
+      width: 10px;
+      height: 18px;
+      top: -20px;
+      z-index: 30;
+      animation: caer 3s linear forwards;
+    }
+
+    @keyframes aparecer {
+      from {
+        opacity: 0;
+        transform: scale(0.5) rotate(-8deg);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1) rotate(0deg);
+      }
+    }
+
+    @keyframes premioZoom {
+      0% {
+        transform: scale(0.3) rotate(-15deg);
+        opacity: 0;
+      }
+      70% {
+        transform: scale(1.15) rotate(5deg);
+        opacity: 1;
+      }
+      100% {
+        transform: scale(1) rotate(0deg);
+      }
+    }
+
+    @keyframes bordeBrillante {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    @keyframes caer {
+      to {
+        transform: translateY(110vh) rotate(720deg);
+        opacity: 0;
+      }
+    }
+
+
+
+    .contenedor.oculto {
+      display: none;
+    }
+
+    .pantalla-final {
+      position: fixed;
+      inset: 0;
+      display: none;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 24px;
+      z-index: 15;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at center, rgba(255, 204, 0, 0.28), transparent 35%),
+        radial-gradient(circle, #34345a, #141421);
+    }
+
+    .pantalla-final.activo {
+      display: flex;
+    }
+
+    .final-card {
+      position: relative;
+      width: min(520px, 94vw);
+      padding: 34px 26px;
+      border-radius: 32px;
+      background: rgba(255, 255, 255, 0.96);
+      color: #222;
+      box-shadow:
+        0 0 35px rgba(255, 204, 0, 0.9),
+        0 0 80px rgba(255, 89, 94, 0.45);
+      animation: finalAparece 0.75s ease-out;
+    }
+
+    .final-card::before {
+      content: "";
+      position: absolute;
+      inset: -80px;
+      background: conic-gradient(
+        transparent,
+        rgba(255, 204, 0, 0.55),
+        transparent,
+        rgba(82, 183, 136, 0.45),
+        transparent
+      );
+      z-index: -1;
+      animation: bordeBrillante 3s linear infinite;
+    }
+
+    .final-card h2 {
+      margin: 16px 0 0;
+      font-size: clamp(42px, 8vw, 72px);
+      color: #ff9900;
+      text-shadow:
+        0 4px 0 rgba(0, 0, 0, 0.15),
+        0 0 24px rgba(255, 204, 0, 0.9);
+      animation: textoFinal 1.2s ease-in-out infinite alternate;
+    }
+
+    .final-card img {
+      max-width: min(300px, 76vw);
+      max-height: 300px;
+      width: auto;
+      height: auto;
+      object-fit: contain;
+      animation: imagenFinalFlota 1.8s ease-in-out infinite alternate;
+      filter: drop-shadow(0 14px 18px rgba(0, 0, 0, 0.28));
+    }
+
+    .estrella-final {
+      position: fixed;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #ffcc00;
+      z-index: 18;
+      pointer-events: none;
+      animation: estrellaBrilla 1.7s ease-out forwards;
+    }
+
+    @keyframes finalAparece {
+      from {
+        opacity: 0;
+        transform: scale(0.4) rotate(-8deg);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1) rotate(0deg);
+      }
+    }
+
+    @keyframes imagenFinalFlota {
+      from {
+        transform: translateY(0) scale(1);
+      }
+      to {
+        transform: translateY(-14px) scale(1.05);
+      }
+    }
+
+    @keyframes textoFinal {
+      from {
+        transform: scale(1);
+      }
+      to {
+        transform: scale(1.06);
+      }
+    }
+
+    @keyframes estrellaBrilla {
+      0% {
+        transform: scale(0) rotate(0deg);
+        opacity: 0;
+      }
+      35% {
+        opacity: 1;
+      }
+      100% {
+        transform: scale(2.8) rotate(180deg);
+        opacity: 0;
+      }
+    }
+
+
+    @media (max-width: 600px) {
+      .ruleta-wrapper {
+        width: 340px;
+        height: 340px;
+      }
+
+      .centro {
+        width: 70px;
+        height: 70px;
+        font-size: 13px;
+      }
+
+      .modal-contenido img {
+        max-width: 200px;
+        max-height: 200px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="contenedor">
+    <h1>Los alimentos</h1>
+
+    <div class="ruleta-wrapper">
+      <div class="puntero"></div>
+      <canvas id="ruleta" width="700" height="700"></canvas>
+      <div class="centro">GIRAR</div>
+    </div>
+
+    <button id="btnGirar">Girar ruleta</button>
+  </div>
+
+  <div id="modalPremio" class="modal">
+    <div class="modal-contenido">
+      <p style="font-size: xxx-large;" id="nombrePremio"></p>
+      <img id="imagenPremio" src="" alt="Premio ganado" />
+      <br />
+      <button class="cerrar" id="cerrarModal">Cerrar</button>
+    </div>
+  </div>
+
+
+
+  <div id="pantallaFinal" class="pantalla-final">
+    <div class="final-card">
+      <img id="imagenFinal" src="premios/buen-trabajo.png" alt="Buen trabajo" />
+      <h2>¡Buen trabajo!</h2>
+    </div>
+  </div>
+
+
+  <script>
+    let premios = [
+      {
+        nombre: "el agua",
+        imagen: "premios/agua.png"
+      },
+      {
+        nombre: "la sopa",
+        imagen: "premios/sopa.png"
+      },
+      {
+        nombre: "la leche",
+        imagen: "premios/leche.png"
+      },
+      {
+        nombre: "el jugo",
+        imagen: "premios/jugo.png"
+      },
+      {
+        nombre: "el pan",
+        imagen: "premios/pan.png"
+      }
+    ];
+
+    const colores = [
+      "#ff595e",
+      "#ffca3a",
+      "#8ac926",
+      "#1982c4",
+      "#6a4c93",
+      "#ff924c",
+      "#52b788",
+      "#f72585"
+    ];
+
+    const contenedor = document.querySelector(".contenedor");
+    const pantallaFinal = document.getElementById("pantallaFinal");
+    const imagenFinal = document.getElementById("imagenFinal");
+
+    const imagenFinalFallback = `data:image/svg+xml;utf8,${encodeURIComponent(`
+      <svg xmlns="http://www.w3.org/2000/svg" width="700" height="700" viewBox="0 0 700 700">
+        <rect width="700" height="700" rx="80" fill="#fff7d6"/>
+        <circle cx="350" cy="330" r="190" fill="#ffcc00"/>
+        <path d="M235 310 L315 390 L475 230" fill="none" stroke="#2d6a4f" stroke-width="48" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="190" cy="170" r="30" fill="#ff595e"/>
+        <circle cx="520" cy="175" r="26" fill="#1982c4"/>
+        <circle cx="545" cy="500" r="34" fill="#8ac926"/>
+        <circle cx="150" cy="500" r="24" fill="#f72585"/>
+        <text x="350" y="620" text-anchor="middle" font-family="Arial" font-size="58" font-weight="bold" fill="#222">¡Excelente!</text>
+      </svg>
+    `)}`;
+
+    imagenFinal.onerror = () => {
+      imagenFinal.onerror = null;
+      imagenFinal.src = imagenFinalFallback;
+    };
+
+    const canvas = document.getElementById("ruleta");
+    const ctx = canvas.getContext("2d");
+
+    const btnGirar = document.getElementById("btnGirar");
+    const modalPremio = document.getElementById("modalPremio");
+    const nombrePremio = document.getElementById("nombrePremio");
+    const imagenPremio = document.getElementById("imagenPremio");
+    const cerrarModal = document.getElementById("cerrarModal");
+
+    let imagenesCargadas = [];
+    let rotacionActual = 0;
+    let girando = false;
+    let mostrarFinalAlCerrarModal = false;
+
+    function cargarImagenes() {
+      const promesas = premios.map((premio) => {
+        return new Promise((resolve) => {
+          const img = new Image();
+          img.src = premio.imagen;
+
+          img.onload = () => resolve(img);
+
+          img.onerror = () => {
+            console.warn("No se pudo cargar la imagen:", premio.imagen);
+            resolve(null);
+          };
+        });
+      });
+
+      return Promise.all(promesas);
+    }
+
+    function dibujarImagenContain(ctx, img, x, y, maxWidth, maxHeight) {
+      if (!img) return;
+
+      const ratioImagen = img.width / img.height;
+      const ratioCaja = maxWidth / maxHeight;
+
+      let drawWidth;
+      let drawHeight;
+
+      if (ratioImagen > ratioCaja) {
+        drawWidth = maxWidth;
+        drawHeight = maxWidth / ratioImagen;
+      } else {
+        drawHeight = maxHeight;
+        drawWidth = maxHeight * ratioImagen;
+      }
+
+      ctx.drawImage(
+        img,
+        x - drawWidth / 2,
+        y - drawHeight / 2,
+        drawWidth,
+        drawHeight
+      );
+    }
+
+    function dibujarRuleta() {
+      const width = canvas.width;
+      const height = canvas.height;
+      const centroX = width / 2;
+      const centroY = height / 2;
+      const radio = width / 2 - 20;
+      const cantidadPremios = premios.length;
+
+      ctx.clearRect(0, 0, width, height);
+
+      if (cantidadPremios === 0) {
+        ctx.beginPath();
+        ctx.arc(centroX, centroY, radio, 0, Math.PI * 2);
+        ctx.fillStyle = "#333";
+        ctx.fill();
+        ctx.lineWidth = 12;
+        ctx.strokeStyle = "#ffffff";
+        ctx.stroke();
+
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 34px Arial";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("Sin alimentos", centroX, centroY - 20);
+        ctx.font = "24px Arial";
+        ctx.fillText("Ya salieron todos", centroX, centroY + 25);
+        return;
+      }
+
+      const anguloPorPremio = 360 / cantidadPremios;
+
+      for (let i = 0; i < cantidadPremios; i++) {
+        /*
+          Partimos desde -90 grados para que el primer segmento quede arriba.
+        */
+        const anguloInicio = (-90 + i * anguloPorPremio) * Math.PI / 180;
+        const anguloFin = (-90 + (i + 1) * anguloPorPremio) * Math.PI / 180;
+        const anguloMedio = (anguloInicio + anguloFin) / 2;
+
+        ctx.beginPath();
+        ctx.moveTo(centroX, centroY);
+        ctx.arc(centroX, centroY, radio, anguloInicio, anguloFin);
+        ctx.closePath();
+
+        ctx.fillStyle = colores[i % colores.length];
+        ctx.fill();
+
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 5;
+        ctx.stroke();
+
+        /*
+          Ubicaci�n de la imagen dentro del segmento.
+          Mientras m�s alto sea este valor, m�s cerca del borde queda.
+        */
+        const distanciaImagen = radio * 0.62;
+        const imgX = centroX + Math.cos(anguloMedio) * distanciaImagen;
+        const imgY = centroY + Math.sin(anguloMedio) * distanciaImagen;
+
+        ctx.save();
+
+        ctx.translate(imgX, imgY);
+
+        /*
+          Rotamos la imagen para que mire hacia afuera del centro.
+          Si prefieres que todas las im�genes queden derechas, comenta esta l�nea.
+        */
+        ctx.rotate(anguloMedio + Math.PI / 2);
+
+        /*
+          Tama�o m�ximo de imagen dentro de cada premio.
+          Puedes subir o bajar estos valores.
+        */
+        const maxImgWidth = radio * 0.32;
+        const maxImgHeight = radio * 0.32;
+
+        dibujarImagenContain(ctx, imagenesCargadas[i], 0, 0, maxImgWidth, maxImgHeight);
+
+        ctx.restore();
+
+        /*
+          Texto peque�o bajo la imagen.
+          Si no quieres texto en la ruleta, elimina este bloque.
+        */
+        ctx.save();
+        ctx.translate(
+          centroX + Math.cos(anguloMedio) * (radio * 0.86),
+          centroY + Math.sin(anguloMedio) * (radio * 0.86)
+        );
+        ctx.rotate(anguloMedio + Math.PI / 2);
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 22px Arial";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.lineWidth = 5;
+        ctx.strokeStyle = "rgba(0,0,0,0.55)";
+        ctx.strokeText(premios[i].nombre, 0, 0);
+        ctx.fillText(premios[i].nombre, 0, 0);
+        ctx.restore();
+      }
+
+      ctx.beginPath();
+      ctx.arc(centroX, centroY, radio, 0, Math.PI * 2);
+      ctx.lineWidth = 12;
+      ctx.strokeStyle = "#ffffff";
+      ctx.stroke();
+    }
+
+    function girarRuleta() {
+      if (girando) return;
+
+      if (premios.length === 0) {
+        btnGirar.disabled = true;
+        mostrarPantallaFinal();
+        return;
+      }
+
+      girando = true;
+      btnGirar.disabled = true;
+
+      const cantidadPremios = premios.length;
+      const anguloPorPremio = 360 / cantidadPremios;
+      const premioGanador = Math.floor(Math.random() * cantidadPremios);
+
+      /*
+        El puntero está arriba.
+        Calculamos la rotación necesaria para que el centro del premio
+        quede exactamente debajo del puntero.
+      */
+      const anguloCentroPremio = premioGanador * anguloPorPremio + anguloPorPremio / 2;
+      const vueltasExtra = 6 * 360;
+      const ajuste = 360 - anguloCentroPremio;
+
+      const rotacionNormalizada = ((rotacionActual % 360) + 360) % 360;
+      const rotacionNecesaria = vueltasExtra + ajuste - rotacionNormalizada;
+
+      rotacionActual += rotacionNecesaria;
+
+      canvas.style.transform = `rotate(${rotacionActual}deg)`;
+
+      setTimeout(() => {
+        mostrarModalPremio(premioGanador);
+        eliminarPremioGanador(premioGanador);
+
+        if (premios.length === 0) {
+          mostrarFinalAlCerrarModal = true;
+          btnGirar.disabled = true;
+        } else {
+          btnGirar.disabled = false;
+        }
+
+        girando = false;
+      }, 5200);
+    }
+
+    function eliminarPremioGanador(index) {
+      premios.splice(index, 1);
+      imagenesCargadas.splice(index, 1);
+      dibujarRuleta();
+    }
+
+    function mostrarModalPremio(index) {
+      const premio = premios[index];
+
+      nombrePremio.textContent = premio.nombre;
+      imagenPremio.src = premio.imagen;
+      imagenPremio.alt = premio.nombre;
+
+      modalPremio.classList.add("activo");
+      crearConfetti();
+    }
+
+    function mostrarPantallaFinal() {
+      modalPremio.classList.remove("activo");
+      contenedor.classList.add("oculto");
+      pantallaFinal.classList.add("activo");
+      crearConfetti(160);
+      crearEstrellasFinales();
+    }
+
+    function crearConfetti(cantidad = 90) {
+      const coloresConfetti = [
+        "#ffcc00",
+        "#ff595e",
+        "#8ac926",
+        "#1982c4",
+        "#f72585",
+        "#ffffff"
+      ];
+
+      for (let i = 0; i < cantidad; i++) {
+        const confetti = document.createElement("div");
+        confetti.classList.add("confetti");
+
+        confetti.style.left = Math.random() * 100 + "vw";
+        confetti.style.background = coloresConfetti[
+          Math.floor(Math.random() * coloresConfetti.length)
+        ];
+        confetti.style.animationDelay = Math.random() * 0.8 + "s";
+        confetti.style.animationDuration = 2.2 + Math.random() * 1.8 + "s";
+        confetti.style.transform = `rotate(${Math.random() * 360}deg)`;
+
+        document.body.appendChild(confetti);
+
+        setTimeout(() => {
+          confetti.remove();
+        }, 4500);
+      }
+    }
+
+
+
+    function crearEstrellasFinales() {
+      for (let i = 0; i < 45; i++) {
+        const estrella = document.createElement("div");
+        estrella.classList.add("estrella-final");
+        estrella.style.left = Math.random() * 100 + "vw";
+        estrella.style.top = Math.random() * 100 + "vh";
+        estrella.style.animationDelay = Math.random() * 1.2 + "s";
+        estrella.style.background = colores[Math.floor(Math.random() * colores.length)];
+
+        document.body.appendChild(estrella);
+
+        setTimeout(() => {
+          estrella.remove();
+        }, 3000);
+      }
+    }
+
+    function cerrarModalPremio() {
+      modalPremio.classList.remove("activo");
+
+      if (mostrarFinalAlCerrarModal) {
+        mostrarFinalAlCerrarModal = false;
+        mostrarPantallaFinal();
+      }
+    }
+
+    cerrarModal.addEventListener("click", cerrarModalPremio);
+
+    modalPremio.addEventListener("click", (event) => {
+      if (event.target === modalPremio) {
+        cerrarModalPremio();
+      }
+    });
+
+    btnGirar.addEventListener("click", girarRuleta);
+
+    cargarImagenes().then((imgs) => {
+      imagenesCargadas = imgs;
+      dibujarRuleta();
+    });
+  </script>
+</body>
+</html>
